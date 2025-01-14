@@ -1,0 +1,5 @@
+.env
+cache.db
+*.pyc
+private_test.json
+results.json

@@ -1,0 +1,8 @@
+pytest
+psutil
+memory_profiler
+pydantic
+python-dotenv
+requests
+structlog
+tqdm
