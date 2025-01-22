@@ -23,14 +23,7 @@ This document explains the core methods of the LLM interface in `candidate/src/l
 - Returns: List of response strings
 
 ### total_cost()
-- Calculates the total cost of API usage
-- Tracks both prompt and completion tokens
-- Returns cost in USD based on the model used
-
-### model_name()
-- Returns the name of the current model
-- Used for caching and cost calculations
-- Example: "gpt-3.5-turbo" or "gpt-4"
+- Returns the total cost of API usage in USD based on prompt and completion tokens
 
 ## Message Structure
 
