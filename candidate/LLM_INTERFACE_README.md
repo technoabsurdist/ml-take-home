@@ -1,148 +1,67 @@
 # LLM Interface Documentation
 
-This document describes the LLM interface implementation found in `candidate/src/llm/`. The interface provides a flexible and extensible way to interact with Large Language Models, with built-in support for OpenAI's models.
+This document explains the core methods of the LLM interface in `candidate/src/llm/`.
 
-## Architecture Overview
+## Core Methods
 
-The LLM interface consists of two main components:
+### predict(chat, max_tokens=1000, temperature=0.0)
+- Generates a single response for a given chat
+- Parameters:
+  - `chat`: A TextChat object containing the conversation
+  - `max_tokens`: Maximum length of the response
+  - `temperature`: Controls randomness (0.0 = deterministic)
+- Returns: String containing the model's response
+- Includes automatic caching of responses
 
-1. **Base Abstract Class (`core.py`)**: Defines the interface contract and common functionality
-2. **OpenAI Implementation (`openai.py`)**: Provides concrete implementation for OpenAI models
+### sample(chat, max_tokens=1000, temperature=0.0, num_samples=1)
+- Generates multiple responses for a given chat
+- Parameters:
+  - `chat`: A TextChat object containing the conversation
+  - `max_tokens`: Maximum length of each response
+  - `temperature`: Controls randomness
+  - `num_samples`: Number of responses to generate
+- Returns: List of response strings
 
-### BaseLLM Abstract Class
+### total_cost()
+- Calculates the total cost of API usage
+- Tracks both prompt and completion tokens
+- Returns cost in USD based on the model used
 
-The `BaseLLM` class in `core.py` serves as the foundation for all LLM implementations. It provides:
+### model_name()
+- Returns the name of the current model
+- Used for caching and cost calculations
+- Example: "gpt-3.5-turbo" or "gpt-4"
 
-- Abstract methods that must be implemented by concrete classes:
-  - `_predict()`: Generate a single completion
-  - `_sample()`: Generate multiple completions
-  - `total_cost()`: Calculate usage costs
-  - `model_name()`: Get the name of the model
+## Message Structure
 
-- Built-in features:
-  - SQLite-based response caching
-  - Cost tracking
-  - Standardized interface for both chat and completion
+### TextChat
+- Container for conversation messages
+- Requires at least one message
+- First message must be from user
+- Optional system prompt for context
+- Example:
+```python
+chat = TextChat(
+    messages=[TextUserMessage(content="Hello")],
+    system_prompt="Be helpful"  # Optional
+)
+```
 
-### Message Structure and Validation
-
-The interface uses Pydantic models to ensure proper message structure:
-
-- `TextUserMessage`: Messages from the user
-- `TextAssistantMessage`: Messages from the assistant
-- `TextChat`: Container for conversation history that enforces:
-  - At least one message must be present
-  - First message must be from the user
-  - Consecutive messages must alternate between user and assistant
-  - Optional system prompt support
-
-## OpenAI Implementation
-
-The `OpenAI` class in `openai.py` implements the `BaseLLM` interface for OpenAI models. Features include:
-
-- Support for various GPT models
-- Configurable settings:
-  - Maximum retries
-  - Timeout duration
-  - Temperature
-  - Maximum tokens
-- Token usage tracking
-- Model-specific cost calculation
-
-### Cost Tracking
-
-The implementation tracks costs based on the model used:
-- GPT-3.5 Turbo
-- GPT-4
-- Custom variants (e.g., GPT-4-mini)
-
-Costs are calculated based on both prompt and completion tokens.
-
-## Key Features
-
-### Caching System
-
-The interface includes an SQLite-based caching system that:
-- Stores responses to avoid redundant API calls
-- Uses a hash of the entire conversation as the cache key
-- Supports both single predictions and multiple samples
-- Persists across sessions
-
-### Message Validation
-
-The interface enforces strict message validation:
-- Proper message order
-- Role alternation
-- Required user first message
-- Optional system prompt support
-
-## Usage Requirements
-
-### Dependencies
-
-- `pydantic`: For data validation and settings management
-- `sqlite3`: For response caching
-- OpenAI API credentials:
-  - API key (required)
-  - Organization ID (optional)
-
-### Basic Usage Example
+## Basic Usage
 
 ```python
 from src.llm.openai import OpenAI
 from src.llm.core import TextChat, TextUserMessage
 
-# Initialize the OpenAI implementation
-llm = OpenAI(
-    model="gpt-3.5-turbo",
-    api_key="your-api-key",
-    org_id=None  # Optional
-)
+# Initialize
+llm = OpenAI(model="gpt-3.5-turbo", api_key="your-key")
 
-# Create a chat
-chat = TextChat(
-    messages=[TextUserMessage(content="Hello, how are you?")],
-    system_prompt="You are a helpful assistant."  # Optional
-)
-
-# Get a single prediction
+# Get single response
+chat = TextChat(messages=[TextUserMessage(content="Hello")])
 response = llm.predict(chat)
 
-# Get multiple samples
-samples = llm.sample(chat, num_samples=3, temperature=0.7)
+# Get multiple responses
+samples = llm.sample(chat, num_samples=3)
 
-# Check usage costs
-total_cost = llm.total_cost()
-```
-
-## Design Patterns
-
-The interface implements several design patterns:
-- **Abstract Base Class**: For defining the interface contract
-- **Builder Pattern**: For constructing API requests
-- **Factory Pattern**: For message creation
-- **Strategy Pattern**: For different LLM implementations
-
-## Error Handling
-
-The interface includes proper error handling for:
-- Invalid message sequences
-- API failures (with retries)
-- Unsupported model configurations
-- Cache operation failures
-
-## Best Practices
-
-1. Always initialize the LLM with proper credentials
-2. Use system prompts to set context when needed
-3. Consider using caching for development and testing
-4. Monitor costs using the `total_cost()` method
-5. Handle potential API errors in your implementation
-
-## Future Extensibility
-
-The interface is designed to be extensible:
-- New LLM providers can be added by implementing `BaseLLM`
-- Additional features can be added to the base class
-- Cache implementation can be modified or replaced
-- Cost calculation can be updated for new models
+# Check cost
+cost = llm.total_cost()
