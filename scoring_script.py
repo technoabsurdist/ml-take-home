@@ -31,7 +31,7 @@ def load_candidate_agent(agent_path: str):
     return agent_module.Agent()
 
 
-def run_script_with_io(script_content: str, input_str: str, timeout: int = 30):
+def run_script_with_io(script_content: str, input_str: str, timeout: int = 5):
     """
     Run the script_content as a Python script in a subprocess,
     feeding `input_str` to stdin. Capture stdout and stderr.
@@ -171,7 +171,7 @@ def main():
         sys.exit(1)
 
     # Load the list of questions/tests (which contain "input" and "output" arrays)
-    questions_path = os.path.join(test_dir, "public_test.json")
+    questions_path = os.path.join(test_dir, "private_test.json")
     if not os.path.exists(questions_path):
         print("public_test.json not found.", file=sys.stderr)
         sys.exit(1)
@@ -220,6 +220,8 @@ def main():
         "total_questions": total_questions,
         "passed_count": passed_count,
     }
+
+    print(f"Total cost: ${llm.total_cost():.2f}")
 
     with open("results.json", "w") as f:
         f.write(json.dumps(results | {"details": question_results}, indent=2))
