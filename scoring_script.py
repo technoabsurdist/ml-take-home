@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import importlib.util
 import traceback
+import concurrent.futures
 from src.llm.openai import OpenAI
 from memory_profiler import memory_usage
 from dotenv import load_dotenv
@@ -78,6 +79,86 @@ def measure_resource_usage(func, *args, **kwargs):
     }
 
 
+def process_single_question(item, agent, llm):
+    """Process a single test question using the provided agent and LLM.
+    
+    Args:
+        item: Dict containing the question and test cases
+        agent: The loaded candidate agent
+        llm: The OpenAI LLM instance
+    
+    Returns:
+        Dict containing test results, including:
+        - passed: Whether all tests passed
+        - resources: Resource usage statistics
+        - question: The original question
+        - test_details: Details of individual test runs
+        - error: Error message if an exception occurred
+    """
+    question = item.get("question", "")
+    test_inputs = item.get("input", [])
+    test_outputs = item.get("output", [])
+    
+    assert len(test_inputs) == len(test_outputs), "Input and output arrays must have the same length"
+    
+    try:
+        # Get the candidate solution code with resource usage tracking
+        script_content, resources = measure_resource_usage(
+            agent.predict, llm, question
+        )
+        
+        # Run each test case
+        all_tests_passed = True
+        individual_test_results = []
+        
+        for idx, input_str in enumerate(test_inputs):
+            expected_output = test_outputs[idx]
+            returncode, stdout, stderr = run_script_with_io(script_content, input_str)
+            
+            # Compare outputs (stripping trailing spaces/newlines)
+            stdout_stripped = stdout.rstrip("\n")
+            expected_stripped = expected_output.rstrip("\n")
+            
+            test_passed = returncode == 0 and stdout_stripped == expected_stripped
+            if not test_passed:
+                all_tests_passed = False
+            
+            individual_test_results.append({
+                "test_index": idx,
+                "input": input_str,
+                "expected_output": expected_output,
+                "actual_output": stdout,
+                "passed": test_passed,
+                "return_code": returncode,
+                "stderr": stderr,
+            })
+        
+        return {
+            "question": question,
+            "passed": all_tests_passed,
+            "resources": resources,
+            "test_details": individual_test_results,
+        }
+        
+    except NotImplementedError:
+        print(
+            f"Agent.predict not implemented for question: {question}",
+            file=sys.stderr,
+        )
+        return {
+            "question": question,
+            "passed": False,
+            "error": "NotImplementedError"
+        }
+    except Exception:
+        err = traceback.format_exc()
+        return {
+            "question": question,
+            "passed": False,
+            "error": err
+        }
+
+
 def main():
     test_dir = "/test_set"
     candidate_dir = "/candidate"
@@ -112,79 +193,25 @@ def main():
     total_questions = len(test_info_list)
     question_results = []
 
-    for item in tqdm(test_info_list, desc="Evaluating", unit="question"):
-        question = item.get("question", "")
-        test_inputs = item.get("input", [])
-        test_outputs = item.get("output", [])
-
-        assert len(test_inputs) == len(
-            test_outputs
-        ), "Input and output arrays must have the same length"
-
-        # 1) Use measure_resource_usage to run agent.predict
-        #    to get the candidate solution code
-        try:
-            script_content, resources = measure_resource_usage(
-                agent.predict, llm, question
-            )
-        except NotImplementedError:
-            print(
-                f"Agent.predict not implemented for question: {question}",
-                file=sys.stderr,
-            )
-            question_results.append(
-                {"question": question, "passed": False, "error": "NotImplementedError"}
-            )
-            continue
-        except Exception:
-            err = traceback.format_exc()
-            question_results.append(
-                {"question": question, "passed": False, "error": err}
-            )
-            continue
-
-        # 2) For each (input -> output) in the test set, run the script and compare
-        all_tests_passed = True
-        individual_test_results = []
-
-        for idx, input_str in enumerate(test_inputs):
-            expected_output = test_outputs[idx]
-
-            returncode, stdout, stderr = run_script_with_io(script_content, input_str)
-
-            # Compare the candidate’s stdout with the expected output
-            # (We can strip trailing spaces/newlines if necessary)
-            stdout_stripped = stdout.rstrip("\n")
-            expected_stripped = expected_output.rstrip("\n")
-
-            test_passed = returncode == 0 and stdout_stripped == expected_stripped
-            if not test_passed:
-                all_tests_passed = False
-
-            individual_test_results.append(
-                {
-                    "test_index": idx,
-                    "input": input_str,
-                    "expected_output": expected_output,
-                    "actual_output": stdout,
-                    "passed": test_passed,
-                    "return_code": returncode,
-                    "stderr": stderr,
-                }
-            )
-
-        # If all input-output pairs for this question passed, increment counter
-        if all_tests_passed:
-            passed_count += 1
-
-        question_results.append(
-            {
-                "question": question,
-                "passed": all_tests_passed,
-                "resources": resources,
-                "test_details": individual_test_results,
-            }
-        )
+    # Process questions in parallel using ThreadPoolExecutor
+    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+        # Submit all questions to the executor
+        future_to_item = {
+            executor.submit(process_single_question, item, agent, llm): item
+            for item in test_info_list
+        }
+        
+        # Process results as they complete, with progress bar
+        for future in tqdm(
+            concurrent.futures.as_completed(future_to_item),
+            total=len(future_to_item),
+            desc="Evaluating",
+            unit="question"
+        ):
+            result = future.result()
+            question_results.append(result)
+            if result.get("passed", False):
+                passed_count += 1
 
     final_score = passed_count / total_questions
 
