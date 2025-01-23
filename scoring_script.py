@@ -171,7 +171,7 @@ def main():
         sys.exit(1)
 
     # Load the list of questions/tests (which contain "input" and "output" arrays)
-    questions_path = os.path.join(test_dir, "private_test.json")
+    questions_path = os.path.join(test_dir, "public_test.json")
     if not os.path.exists(questions_path):
         print("public_test.json not found.", file=sys.stderr)
         sys.exit(1)
