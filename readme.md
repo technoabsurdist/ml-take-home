@@ -81,16 +81,12 @@ print(result)
 ## Setup
 
 1. Install Docker: https://docs.docker.com/get-docker/
-2. Install requirements:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Add an OpenAI API key to a `.env` file (see `.env.example`).
-4. Run the test runner:
+2. Add an OpenAI API key to a `candidate/.env` file (see `candidate/.env.example`).
+3. Run the test runner:
    ```bash
     ./run.sh
    ```
-5. Verify that the test runner executes successfully (note that the agent won't pass the tests initially)
+4. Verify that the test runner executes successfully (note that the agent will only get some instances correct)
 
 ## Getting Started
 
