@@ -200,18 +200,22 @@ def main():
             executor.submit(process_single_question, item, agent, llm): item
             for item in test_info_list
         }
-        
+
         # Process results as they complete, with progress bar
-        for future in tqdm(
+        pbar = tqdm(
             concurrent.futures.as_completed(future_to_item),
             total=len(future_to_item),
             desc="Evaluating",
-            unit="question"
-        ):
+            unit="question",
+        )
+        for future in pbar:
             result = future.result()
             question_results.append(result)
             if result.get("passed", False):
                 passed_count += 1
+            # Update progress bar description with current score
+            current_score = passed_count / len(question_results)
+            pbar.set_description(f"Score: {current_score:.1%}")
 
     final_score = passed_count / total_questions
 
