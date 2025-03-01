@@ -31,6 +31,7 @@ Instructions:
 5. Handle input and output as specified in the question, typically reading from stdin and writing to stdout.
 6. Include brief comments to explain key parts of your code.
 7. Do not include any explanations or additional text outside of the Python code itself.
+8. If you have made previous attempts to solve the problem, and they failed, please analyze the failures and write a new solution that addresses the failures.
 
 Remember:
 - Your solution will be graded automatically, so adhere strictly to the input/output requirements.
@@ -43,10 +44,8 @@ Now, please provide your Python solution to the coding question.
 class Agent(BaseAgent):
 
     def predict(self, llm: BaseLLM, question: str) -> str:
-        # extrac tests
         tests_info = self.extract_tests(question)
 
-        # generate solution
         chat = TextChat(
             system_prompt="You are a highly skilled software engineer.",
             messages=[TextUserMessage(content=PROMPT.format(question=question))],
@@ -65,27 +64,33 @@ class Agent(BaseAgent):
         retry_count = 0
         max_retries = 5
         
+        solution_history = []
+        if failed_results:
+            solution_history.append({
+                "attempt": 1,
+                "solution": solution,
+                "failures": failed_results.copy()
+            })
+        
         while failed_results and retry_count < max_retries:
             print(f"Retrying {retry_count + 1} time(s)")
-            failed_tests_info = "\n".join(failed_results)
-            enhanced_question = f"""
-You've previously written a solution to this problem, but it failed to pass some tests.
-
-Fix the issues in your solution.
-
-PREVIOUS ATTEMPT:
-```python
-{solution}
-```
-
-TEST FAILURES:
-{failed_tests_info}
-
-Please fix these issues in your solution."""
             
+            history_prompt = "You've made previous attempts to solve this problem, but they failed to pass some tests.\n\n"
+            
+            for i, attempt in enumerate(solution_history):
+                history_prompt += f"ATTEMPT #{i+1}:\n```python\n{attempt['solution']}\n```\n\n"
+                history_prompt += f"FAILURES FOR ATTEMPT #{i+1}:\n"
+                history_prompt += "\n".join(attempt["failures"]) + "\n\n"
+            
+            print("\n\n\n\n")
+            print("--------------------------------")
+            print(f"{history_prompt}\n\n{PROMPT.format(question=question)}")
+            print("--------------------------------")
+            print("\n\n\n\n")
+
             chat = TextChat(
                 system_prompt="You are a highly skilled software engineer.",
-                messages=[TextUserMessage(content=f"{enhanced_question}\n\n{PROMPT.format(question=question)}")],
+                messages=[TextUserMessage(content=f"{history_prompt}\n\n{PROMPT.format(question=question)}")],
             )
             raw_response = llm.predict(chat, max_tokens=1000, temperature=0.0)
             solution = raw_response.replace("```python", "").replace("```", "").strip()
@@ -98,12 +103,16 @@ Please fix these issues in your solution."""
                 if result != "passed":
                     failed_results.append(result)
             
-            print(TextUserMessage(content=f"{enhanced_question}\n\n{PROMPT.format(question=question)}"))
-            print("--------------------------------\n\n\n")
-            print("failed test results: ", len(failed_results))
-            print("--------------------------------\n\n\n")
- 
             retry_count += 1
+            if failed_results:
+                solution_history.append({
+                    "attempt": retry_count + 1,
+                    "solution": solution,
+                    "failures": failed_results.copy()
+                })
+            
+            print(f"Debug - History length: {len(solution_history)}")
+            print("Debug - Failed test results: ", len(failed_results))
         
         return solution
 
