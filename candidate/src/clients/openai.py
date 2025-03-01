@@ -1,11 +1,9 @@
-from collections.abc import Mapping
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from time import perf_counter
 from typing import Literal
 
 import requests
-from pydantic import BaseModel
-from pydantic import Field
+from pydantic import BaseModel, Field
 from structlog.stdlib import get_logger
 
 _logger = get_logger()
@@ -41,6 +39,7 @@ OpenAIChatModelName = Literal[
     "ft:gpt-4o-mini-2024-07-18:elicit-experiments:4o-mini-judge:9w1iRtNB",  # best of 1
     "ft:gpt-4o-2024-08-06:elicit-experiments:4o-judge:A0N2QXM6",  # best of 1
     "ft:gpt-4o-2024-08-06:elicit-experiments:blind-judge-v0:A0N167Qb",
+    "ft:gpt-4o-mini-2024-07-18:elicit-experiments:test-extractor:B6KAXvuu",  # extract tests from problem statement
 ]
 
 OpenAIReasoningModelName = Literal["o1-mini-2024-09-12", "o1-preview-2024-09-12"]
