@@ -1,3 +1,8 @@
+
+Important notes: 
+
+- I had to modify the outputs of problem [234B](https://codeforces.com/problemset/problem/234/B) test because the expected outputs in the original files were all "File not found." I'm guessing a problem with the extraction code. I included the tests from the example, so I guess this problem counts as "free" because the solutions are included in the example. 
+
 ### checkpoint 1 
 
 architecture: 
@@ -37,9 +42,9 @@ results:
 ```
 Total cost: $0.05
 {
-  "score": 0.5,
+  "score": 0.53...,
   "total_questions": 30,
-  "passed_count": 15
+  "passed_count": 16
 }
 ```
 
