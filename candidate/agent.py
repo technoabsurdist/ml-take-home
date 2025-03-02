@@ -45,71 +45,93 @@ Now, please provide your Python solution to the coding question.
 class Agent(BaseAgent):
     def predict(self, llm: BaseLLM, question: str) -> str:
         tests_info = self.extract_tests(question)
+        solution = self._generate_initial_solution(llm, question)
 
-        chat = TextChat(
-            system_prompt="You are a highly skilled software engineer.",
-            messages=[TextUserMessage(content=PROMPT.format(question=question))],
-        )
-        raw_response = llm.predict(chat, max_tokens=1000, temperature=0.0)
-        solution = raw_response.replace("```python", "").replace("```", "").strip()
-
-        failed_results = []
-        for test in tests_info["tests"]:
-            input = test["input"]
-            output = test["output"]
-            result = check_correctness(solution, input, output, 2)
-            if result != "passed":
-                failed_results.append(result)
-
-        retry_count = 0
-        max_retries = 5
-
+        failed_results = self._evaluate_solution(solution, tests_info)
         solution_history = []
+
         if failed_results:
             solution_history.append(
                 {"attempt": 1, "solution": solution, "failures": failed_results.copy()}
             )
 
-        while failed_results and retry_count < max_retries:
-            history_prompt = "You've made previous attempts to solve this problem, but they failed to pass some tests.\n\n"
-
-            for i, attempt in enumerate(solution_history):
-                history_prompt += (
-                    f"ATTEMPT #{i + 1}:\n```python\n{attempt['solution']}\n```\n\n"
-                )
-                history_prompt += f"FAILURES FOR ATTEMPT #{i + 1}:\n"
-                history_prompt += "\n".join(attempt["failures"]) + "\n\n"
-
-            chat = TextChat(
-                system_prompt="You are a highly skilled software engineer.",
-                messages=[
-                    TextUserMessage(
-                        content=f"{history_prompt}\n\n{PROMPT.format(question=question)}"
-                    )
-                ],
+            solution = self._iterative_refinement(
+                llm, question, solution_history, tests_info
             )
-            raw_response = llm.predict(chat, max_tokens=1000, temperature=0.0)
-            solution = raw_response.replace("```python", "").replace("```", "").strip()
-
-            failed_results = []
-            for test in tests_info["tests"]:
-                input = test["input"]
-                output = test["output"]
-                result = check_correctness(solution, input, output, 2)
-                if result != "passed":
-                    failed_results.append(result)
-
-            retry_count += 1
-            if failed_results:
-                solution_history.append(
-                    {
-                        "attempt": retry_count + 1,
-                        "solution": solution,
-                        "failures": failed_results.copy(),
-                    }
-                )
 
         return solution
+
+    def _generate_initial_solution(self, llm: BaseLLM, question: str) -> str:
+        chat = TextChat(
+            system_prompt="You are a highly skilled software engineer.",
+            messages=[TextUserMessage(content=PROMPT.format(question=question))],
+        )
+        raw_response = llm.predict(chat, max_tokens=1000, temperature=0.0)
+        return raw_response.replace("```python", "").replace("```", "").strip()
+
+    def _evaluate_solution(self, solution: str, tests_info: dict) -> list:
+        failed_results = []
+        for test in tests_info["tests"]:
+            input = test["input"]
+            output = test["output"]
+            result = check_correctness(solution, input, output, 4)
+            if result != "passed":
+                failed_results.append(result)
+        return failed_results
+
+    def _iterative_refinement(
+        self, llm: BaseLLM, question: str, solution_history: list, tests_info: dict
+    ) -> str:
+        retry_count = 0
+        max_retries = 5
+
+        while retry_count < max_retries:
+            history_prompt = self._build_history_prompt(solution_history)
+
+            solution = self._generate_refined_solution(llm, question, history_prompt)
+
+            failed_results = self._evaluate_solution(solution, tests_info)
+
+            if not failed_results:
+                break
+
+            retry_count += 1
+            solution_history.append(
+                {
+                    "attempt": retry_count + 1,
+                    "solution": solution,
+                    "failures": failed_results.copy(),
+                }
+            )
+
+        return solution
+
+    def _build_history_prompt(self, solution_history: list) -> str:
+        history_prompt = "You've made previous attempts to solve this problem, but they failed to pass some tests.\n\n"
+
+        for i, attempt in enumerate(solution_history):
+            history_prompt += (
+                f"ATTEMPT #{i + 1}:\n```python\n{attempt['solution']}\n```\n\n"
+            )
+            history_prompt += f"FAILURES FOR ATTEMPT #{i + 1}:\n"
+            history_prompt += "\n".join(attempt["failures"]) + "\n\n"
+
+        return history_prompt
+
+    def _generate_refined_solution(
+        self, llm: BaseLLM, question: str, history_prompt: str
+    ) -> str:
+        """Generate a refined solution based on previous attempts."""
+        chat = TextChat(
+            system_prompt="You are a highly skilled software engineer.",
+            messages=[
+                TextUserMessage(
+                    content=f"{history_prompt}\n\n{PROMPT.format(question=question)}"
+                )
+            ],
+        )
+        raw_response = llm.predict(chat, max_tokens=1000, temperature=0.0)
+        return raw_response.replace("```python", "").replace("```", "").strip()
 
     def extract_tests(self, question: str) -> list:
         test_extractor_llm = OpenAI(

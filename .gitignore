@@ -3,3 +3,4 @@ cache.db
 *.pyc
 private_test.json
 results.json
+questions.json
