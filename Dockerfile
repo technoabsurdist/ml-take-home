@@ -17,6 +17,7 @@ ENV PYTHONPATH="${PYTHONPATH}:/app"
 # Copy over src and set permissions
 COPY candidate/src /app/src
 COPY candidate/.env /app/.env
+COPY candidate/eval.py /app/eval.py
 COPY scoring_script.py /app/scoring_script.py
 RUN chown -R evaluator:evaluator /app
 

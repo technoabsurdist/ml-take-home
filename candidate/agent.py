@@ -2,6 +2,7 @@ import json
 import os
 
 from dotenv import load_dotenv
+from eval import check_correctness
 from src.agent import BaseAgent
 from src.llm.core import BaseLLM, TextChat, TextUserMessage
 from src.llm.openai import OpenAI
@@ -42,7 +43,6 @@ Now, please provide your Python solution to the coding question.
 
 
 class Agent(BaseAgent):
-
     def predict(self, llm: BaseLLM, question: str) -> str:
         tests_info = self.extract_tests(question)
 
@@ -60,41 +60,37 @@ class Agent(BaseAgent):
             result = check_correctness(solution, input, output, 2)
             if result != "passed":
                 failed_results.append(result)
-        
+
         retry_count = 0
         max_retries = 5
-        
+
         solution_history = []
         if failed_results:
-            solution_history.append({
-                "attempt": 1,
-                "solution": solution,
-                "failures": failed_results.copy()
-            })
-        
+            solution_history.append(
+                {"attempt": 1, "solution": solution, "failures": failed_results.copy()}
+            )
+
         while failed_results and retry_count < max_retries:
-            print(f"Retrying {retry_count + 1} time(s)")
-            
             history_prompt = "You've made previous attempts to solve this problem, but they failed to pass some tests.\n\n"
-            
+
             for i, attempt in enumerate(solution_history):
-                history_prompt += f"ATTEMPT #{i+1}:\n```python\n{attempt['solution']}\n```\n\n"
-                history_prompt += f"FAILURES FOR ATTEMPT #{i+1}:\n"
+                history_prompt += (
+                    f"ATTEMPT #{i + 1}:\n```python\n{attempt['solution']}\n```\n\n"
+                )
+                history_prompt += f"FAILURES FOR ATTEMPT #{i + 1}:\n"
                 history_prompt += "\n".join(attempt["failures"]) + "\n\n"
-            
-            print("\n\n\n\n")
-            print("--------------------------------")
-            print(f"{history_prompt}\n\n{PROMPT.format(question=question)}")
-            print("--------------------------------")
-            print("\n\n\n\n")
 
             chat = TextChat(
                 system_prompt="You are a highly skilled software engineer.",
-                messages=[TextUserMessage(content=f"{history_prompt}\n\n{PROMPT.format(question=question)}")],
+                messages=[
+                    TextUserMessage(
+                        content=f"{history_prompt}\n\n{PROMPT.format(question=question)}"
+                    )
+                ],
             )
             raw_response = llm.predict(chat, max_tokens=1000, temperature=0.0)
             solution = raw_response.replace("```python", "").replace("```", "").strip()
-            
+
             failed_results = []
             for test in tests_info["tests"]:
                 input = test["input"]
@@ -102,18 +98,17 @@ class Agent(BaseAgent):
                 result = check_correctness(solution, input, output, 2)
                 if result != "passed":
                     failed_results.append(result)
-            
+
             retry_count += 1
             if failed_results:
-                solution_history.append({
-                    "attempt": retry_count + 1,
-                    "solution": solution,
-                    "failures": failed_results.copy()
-                })
-            
-            print(f"Debug - History length: {len(solution_history)}")
-            print("Debug - Failed test results: ", len(failed_results))
-        
+                solution_history.append(
+                    {
+                        "attempt": retry_count + 1,
+                        "solution": solution,
+                        "failures": failed_results.copy(),
+                    }
+                )
+
         return solution
 
     def extract_tests(self, question: str) -> list:
@@ -124,81 +119,10 @@ class Agent(BaseAgent):
 
         chat = TextChat(
             system_prompt="You are an AI assistant that extracts test cases from competitive programming problems. Always return the result as a valid JSON object with fields for 'num_tests' and an array of 'tests' containing input/output pairs.",
-            messages=[
-                TextUserMessage(
-                    content=question
-                )
-            ],
+            messages=[TextUserMessage(content=question)],
         )
         raw_response = test_extractor_llm.predict(
             chat, max_tokens=2000, temperature=0.2
         )
         tests_info = json.loads(raw_response)
-        return tests_info 
-
-
-
-
-###### EVALUATION CODE
-# WARNING
-# This program would not be safe to run in a production environment.
-# It is designed to be run in a sandboxed environment.
-# it is highly unlikely that model-generated code will do something overtly
-# malicious in response to this test suite, model-generated code may act
-# destructively due to a lack of model capability or alignment.
-
-import multiprocessing
-import queue
-import subprocess
-import sys
-import time
-import traceback
-
-multiprocessing.set_start_method("fork", force=True)
-
-def exec_program(q, program, input_data, expected_output, timeout):
-    try:
-        start_time = time.time()
-        process = subprocess.Popen(
-            [sys.executable, "-c", program],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        stdout, stderr = process.communicate(input=input_data, timeout=timeout)
-        if time.time() - start_time > timeout:
-            raise TimeoutError("Execution timed out.")
-        if process.returncode != 0:
-            q.put(f"failed: {stderr}")
-        else:
-            if stdout.strip() == expected_output.strip():
-                q.put("passed")
-            else:
-                q.put(f"wrong answer. Expected '{expected_output}', got '{stdout}'")
-    except subprocess.TimeoutExpired:
-        process.kill()
-        q.put("timed out")
-    except Exception:
-        q.put(f"failed: {traceback.format_exc()}")
-
-
-def check_correctness(
-    program: str, input_data: str, expected_output: str, timeout: float
-) -> str:
-    q = multiprocessing.Queue()
-    process = multiprocessing.Process(
-        target=exec_program, args=(q, program, input_data, expected_output, timeout)
-    )
-    process.start()
-    process.join(timeout=timeout + 1)
-    if process.is_alive():
-        process.terminate()
-        process.join()
-        result = "timed out"
-    else:
-        try:
-            result = q.get_nowait()
-        except queue.Empty:
-            result = "no result returned"
-    return result
+        return tests_info
