@@ -41,6 +41,10 @@ Remember:
 Now, please provide your Python solution to the coding question.
 """.strip()
 
+EXTRACT_TESTS_PROMPT = (
+    "You are an AI assistant that extracts test cases from competitive programming problems. Always return the result as a valid JSON object with fields for 'num_tests' and an array of 'tests' containing input/output pairs.",
+)
+
 
 class Agent(BaseAgent):
     def predict(self, llm: BaseLLM, question: str) -> str:
@@ -140,7 +144,7 @@ class Agent(BaseAgent):
         )
 
         chat = TextChat(
-            system_prompt="You are an AI assistant that extracts test cases from competitive programming problems. Always return the result as a valid JSON object with fields for 'num_tests' and an array of 'tests' containing input/output pairs.",
+            system_prompt=EXTRACT_TESTS_PROMPT,
             messages=[TextUserMessage(content=question)],
         )
         raw_response = test_extractor_llm.predict(
