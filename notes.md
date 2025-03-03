@@ -1,7 +1,3 @@
-Important notes:
-
-- I had to modify the outputs of problem [234B](https://codeforces.com/problemset/problem/234/B) test because the expected outputs in the original files were all "File not found." I'm guessing a problem with the extraction code. I included the tests from the example, so I guess this problem counts as "free" because the solutions are included in the example.
-
 ### checkpoint 1
 
 architecture:
@@ -77,3 +73,7 @@ I invested ~20 hours in this project. Initial improvement from 30% to 50% accura
 Despite implementing a hybrid approach combining these techniques, improvements remained negligible. Final accuracy stayed at approximately 50%.
 
 Overall, even though I learned a lot by reading through papers and banging my head against the wall for hours trying to figure out how to set up a workflow which would let the model explore various solutions and know which path to go towards, none of the solutions ended up working at the end. The more complex tests almost always failed and none of the strategies I implemented ended up fixing that. If it wasn't finals period this coming week, I would've spent a really long time trying to crack this, because it's actually so fun and I feel like I've learned a LOT from doing it!
+
+### Important side notes:
+
+- I had to modify the outputs of problem [234B](https://codeforces.com/problemset/problem/234/B) test because the expected outputs in the original files were all "File not found." I'm guessing a problem with the extraction code. I included the tests from the example, so I guess this problem counts as "free" because the solutions are included in the example.
