@@ -35,7 +35,7 @@ same as above, just passing more context back on failed tests
 
 notes:
 
-Noticed that sometimes LLMs were retrying and repeating previous mistakes. So, implemented a retry mechanism that tracks solution history across multiple attempts (up to 5), providing the LLM with context about all previous solutions and their specific test failures to avoid repeating mistakes.
+Noticed that sometimes LLMs were retrying and repeating previous mistakes. So, implemented a retry mechanism that tracks solution history across multiple attempts (up to 5), providing the LLM with context about all previous solutions and their specific test failures.
 
 results:
 
@@ -53,9 +53,27 @@ Total cost: $0.05
 
 ### checkpoint 3
 
-- failed experiment: multi-solution approach (generate 2-3 different solution approaches and evaluate each)
-- tdd
-- try meta prompting? Instead of just returning the failed tests and telling the LLM to try again, we can have an LLM evaluate what went wrong and prescribe a fix
-- I like meta prompting! The results seem a tiny bit better, more consistently hitting 16/30.
-- Instead of generating one potential solution, we could generate a list of potential solutions, and then generate a tree that branches off different LLM calls to fix those things. Then repeat. The problem is that this is possibly exponential, but it might not matter if we limit it to 4-5 levels?
-- We're still spending an average 2.37 seconds per question, so we have a lot of room to spare.
+I invested ~20 hours in this project. Initial improvement from 30% to 50% accuracy occurred within the first 5 hours through test extraction and retry mechanisms (checkpoints 1 and 2). The next 15 hours involved a very large number of failed experiments:
+
+1. **Algorithmic approach extraction**: Attempted to categorize problems into algorithmic solution types (Greedy, DP, etc.) via prompt engineering. No improvement in evals.
+
+2. **Model fine-tuning**: Fine-tuned a model on problem descriptions and solution approach tags. Despite accurate categorization, solution accuracy remained at ~50% when giving the model the correct approach to tackle a problem with beforehand (e.g., greedy, dp, etc.).
+
+3. **Test-driven Development**: Enhanced extracted tests to build solutions incrementally from basic to complex tests. No accuracy improvement.
+
+4. **OpenAI paper Implementation**: Read through and applied some insights from OAI's "Competitive Programming with Large Reasoning Models":
+
+   - Implemented self-consistency via multiple generations with majority voting
+   - Attempted subtask decomposition with independent verification
+   - Applied structured code execution and refinement with multi-turn prompting
+   - None of these techniques improved eval performance.
+
+5. **Alpha Code**: Implemented approaches inspired on the Alpha Code paper:
+   - Diversity sampling to generate multiple solutions per step
+   - Test-time augmentation to force model generalization
+   - Meta-prompting for failure analysis and improvement suggestions
+   - None of these techniques improved eval performance.
+
+Despite implementing a hybrid approach combining these techniques, improvements remained negligible. Final accuracy stayed at approximately 50%.
+
+Overall, even though I learned a lot by reading through papers and banging my head against the wall for hours trying to figure out how to set up a workflow which would let the model explore various solutions and know which path to go towards, none of the solutions ended up working at the end. The more complex tests almost always failed and none of the strategies I implemented ended up fixing that. If it wasn't finals period this coming week, I would've spent a really long time trying to crack this, because it's actually so fun and I feel like I've learned a LOT from doing it!
