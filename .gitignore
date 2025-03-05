@@ -4,4 +4,6 @@ cache.db
 private_test.json
 results.json
 questions.json
+.DS_Store
 data.csv
+*/.DS_Store

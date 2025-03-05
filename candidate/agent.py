@@ -75,9 +75,16 @@ class Agent(BaseAgent):
         solution_history = []
 
         if failed_results:
-            reason_for_failure = self._generate_reason_for_failure(llm, question, solution, failed_results)
+            reason_for_failure = self._generate_reason_for_failure(
+                llm, question, solution, failed_results
+            )
             solution_history.append(
-                {"attempt": 1, "solution": solution, "failures": failed_results.copy(), "reason_for_failure": reason_for_failure}
+                {
+                    "attempt": 1,
+                    "solution": solution,
+                    "failures": failed_results.copy(),
+                    "reason_for_failure": reason_for_failure,
+                }
             )
 
             solution = self._iterative_refinement(
@@ -104,11 +111,19 @@ class Agent(BaseAgent):
                 failed_results.append(result)
         return failed_results
 
-    def _generate_reason_for_failure(self, llm: BaseLLM, question: str, solution: str, failed_results: list) -> str:
+    def _generate_reason_for_failure(
+        self, llm: BaseLLM, question: str, solution: str, failed_results: list
+    ) -> str:
         chat = TextChat(
             system_prompt="You are a highly skilled software engineer.",
             messages=[
-                TextUserMessage(content=REASON_FOR_FAILURE_PROMPT.format(question=question, solution=solution, failed_results=failed_results))
+                TextUserMessage(
+                    content=REASON_FOR_FAILURE_PROMPT.format(
+                        question=question,
+                        solution=solution,
+                        failed_results=failed_results,
+                    )
+                )
             ],
         )
         return llm.predict(chat, max_tokens=1000, temperature=0.0)
@@ -126,11 +141,12 @@ class Agent(BaseAgent):
 
             failed_results = self._evaluate_solution(solution, tests_info)
 
-
             if not failed_results:
                 break
 
-            reason_for_failure = self._generate_reason_for_failure(llm, question, solution, failed_results)
+            reason_for_failure = self._generate_reason_for_failure(
+                llm, question, solution, failed_results
+            )
 
             retry_count += 1
             solution_history.append(
@@ -155,12 +171,6 @@ class Agent(BaseAgent):
             history_prompt += "\n".join(attempt["failures"]) + "\n\n"
             history_prompt += f"REASON FOR FAILURE FOR ATTEMPT #{i + 1}:\n"
             history_prompt += f"{attempt['reason_for_failure']}\n\n"
-
-
-        print("-" * 80)
-        print("HISTORY PROMPT:")
-        print(history_prompt)
-        print("-" * 80)
 
         return history_prompt
 
